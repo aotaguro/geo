@@ -1,0 +1,35 @@
+/* Body and Canvas styling */
+body {
+    margin: 0;
+    overflow: hidden;
+}
+
+canvas {
+    display: block;
+    background-color: #222;
+}
+
+/* Player styles */
+.player {
+    --radius: 20px;
+    --color: rgb(22, 249, 234); /* Ensure this is a valid CSS color */
+}
+
+/* Enemy styles */
+.enemy {
+    --size: 20px;
+    --color: rgb(251, 0, 255); /* Ensure this is a valid CSS color */
+}
+
+/* Bullet styles */
+.bullet {
+    --radius: 5px;
+    --color: yellow; /* Ensure this is a valid CSS color */
+}
+
+/* Crosshair styles */
+.crosshair {
+    --color: white; /* Ensure this is a valid CSS color */
+    --line-width: 2px;
+    --size: 10px;
+}
