@@ -10,8 +10,8 @@ const enemyColor = 'rgb(251, 0, 255)';
 const crosshairColor = 'white';
 const playerRadius = 25;  // Increased size
 const bulletRadius = 8;   // Increased size
-const enemySize = 40;      // Increased size
-const crosshairSize = 20;  // Increased size
+const enemySize = 40;     // Increased size
+const crosshairSize = 20; // Increased size
 const crosshairLineWidth = 4; // Increased line width
 
 // Player object
@@ -28,6 +28,9 @@ const player = {
     dx: 0,
     dy: 0,
     health: 100,
+    trail: [], // Trail array for player
+    trailSize: 40, // Set trail size (bigger than player radius)
+    lastDirection: '', // Last movement direction
 };
 
 // Mouse and crosshair
@@ -43,12 +46,8 @@ const bullets = [];
 let keys = {};
 
 // Event listeners for movement
-window.addEventListener('keydown', (e) => {
-    keys[e.key] = true;
-});
-window.addEventListener('keyup', (e) => {
-    keys[e.key] = false;
-});
+window.addEventListener('keydown', (e) => keys[e.key] = true);
+window.addEventListener('keyup', (e) => keys[e.key] = false);
 
 // Track mouse position
 canvas.addEventListener('mousemove', (e) => {
@@ -56,23 +55,48 @@ canvas.addEventListener('mousemove', (e) => {
     mouse.y = e.clientY;
 });
 
+// Move player
 function movePlayer() {
     player.dx = 0;
     player.dy = 0;
 
     // Move player based on key inputs
-    if (keys['ArrowUp'] || keys['w']) player.dy = -player.speed;
-    if (keys['ArrowDown'] || keys['s']) player.dy = player.speed;
-    if (keys['ArrowLeft'] || keys['a']) player.dx = -player.speed;
-    if (keys['ArrowRight'] || keys['d']) player.dx = player.speed;
+    if (keys['ArrowUp'] || keys['w']) {
+        player.dy = -player.speed;
+        player.lastDirection = 'up';
+    }
+    if (keys['ArrowDown'] || keys['s']) {
+        player.dy = player.speed;
+        player.lastDirection = 'down';
+    }
+    if (keys['ArrowLeft'] || keys['a']) {
+        player.dx = -player.speed;
+        player.lastDirection = 'left';
+    }
+    if (keys['ArrowRight'] || keys['d']) {
+        player.dx = player.speed;
+        player.lastDirection = 'right';
+    }
 
     // Check for dash
     if (keys[' '] && !player.isDashing) {
         player.isDashing = true;
         player.dashTime = 0; // Reset dash timer
-        const angle = Math.atan2(mouse.y - player.y, mouse.x - player.x);
-        player.dx += Math.cos(angle) * player.dashSpeed; // Add dash speed to current dx
-        player.dy += Math.sin(angle) * player.dashSpeed; // Add dash speed to current dy
+        
+        // Set the dash direction based on the last movement direction
+        if (player.lastDirection === 'up') {
+            player.dx = 0; // No change in dx, since we move upwards
+            player.dy = -player.dashSpeed; // Dash upwards
+        } else if (player.lastDirection === 'down') {
+            player.dx = 0; // No change in dx, since we move downwards
+            player.dy = player.dashSpeed; // Dash downwards
+        } else if (player.lastDirection === 'left') {
+            player.dx = -player.dashSpeed; // Dash left
+            player.dy = 0; // No change in dy, since we move left
+        } else if (player.lastDirection === 'right') {
+            player.dx = player.dashSpeed; // Dash right
+            player.dy = 0; // No change in dy, since we move right
+        }
     }
 
     // If dashing, update dash timer and position
@@ -91,11 +115,32 @@ function movePlayer() {
         player.y += player.dy;
     }
 
+    // Add position to trail with momentum and spread
+    if (Math.random() < 0.2) { // Change the probability to control how often trails are added
+        const angle = Math.atan2(player.dy, player.dx);
+        const spreadDistance = 15; // Spread distance for the trail
+        const spreadX = Math.cos(angle) * spreadDistance; // Spread on X-axis
+        const spreadY = Math.sin(angle) * spreadDistance; // Spread on Y-axis
+        player.trail.push({ x: player.x + spreadX, y: player.y + spreadY, angle: angle });
+    }
+
+    // Update trail positions based on movement direction
+    player.trail.forEach((trailPoint, index) => {
+        const momentumFactor = 0.5; // Factor to control how much the trail points move
+        trailPoint.x += Math.cos(trailPoint.angle) * momentumFactor;
+        trailPoint.y += Math.sin(trailPoint.angle) * momentumFactor;
+
+        // Limit the trail length (shorter time for trails)
+        if (player.trail.length > 15) { // Shorten trail length to 15
+            player.trail.shift(); // Remove the oldest trail point
+        }
+    });
+
     // Prevent player from going out of bounds
     if (player.x - player.radius < 0) player.x = player.radius;
     if (player.x + player.radius > canvas.width) player.x = canvas.width - player.radius;
     if (player.y - player.radius < 0) player.y = player.radius;
-    if (player.y + player.radius > canvas.height) player.y = canvas.height - player.radius;
+    if (player.y + player.radius > canvas.height) player.y = player.radius;
 }
 
 // Shoot bullets toward the mouse
@@ -126,14 +171,16 @@ function spawnEnemy() {
         y = Math.random() > 0.5 ? 0 - size : canvas.height + size;
     }
 
-    enemies.push({
+    const enemy = {
         x: x,
         y: y,
         size: size,
         color: enemyColor,
         speed: 2,
         health: 100,
-    });
+        trail: [] // Trail array for enemies
+    };
+    enemies.push(enemy);
 }
 
 // Move bullets
@@ -155,25 +202,65 @@ function moveEnemies() {
         const angle = Math.atan2(player.y - enemy.y, player.x - enemy.x);
         enemy.x += Math.cos(angle) * enemy.speed;
         enemy.y += Math.sin(angle) * enemy.speed;
-    });
-}
 
-// Collision detection between bullets and enemies
-function checkCollisions() {
-    bullets.forEach((bullet, bulletIndex) => {
-        enemies.forEach((enemy, enemyIndex) => {
-            const dist = Math.hypot(bullet.x - enemy.x, bullet.y - enemy.y);
-            if (dist - bullet.radius - enemy.size / 2 < 0) {
-                // Bullet hits enemy
-                enemies.splice(enemyIndex, 1);
-                bullets.splice(bulletIndex, 1);
+        // Add position to trail with momentum and spread
+        if (Math.random() < 0.1) { // Change the probability to control how often enemy trails are added
+            const spreadDistance = 15; // Spread distance for the trail
+            const spreadX = Math.cos(angle) * spreadDistance; // Spread on X-axis
+            const spreadY = Math.sin(angle) * spreadDistance; // Spread on Y-axis
+            enemy.trail.push({ x: enemy.x + spreadX, y: enemy.y + spreadY, angle: angle });
+        }
+
+        // Update trail positions based on movement direction
+        enemy.trail.forEach((trailPoint, index) => {
+            const momentumFactor = 0.2; // Factor to control how much the trail points move
+            trailPoint.x += Math.cos(trailPoint.angle) * momentumFactor;
+            trailPoint.y += Math.sin(trailPoint.angle) * momentumFactor;
+
+            // Limit the trail length (shorter time for trails)
+            if (enemy.trail.length > 10) { // Shorten enemy trail length to 10
+                enemy.trail.shift(); // Remove the oldest trail point
             }
         });
     });
 }
 
-// Draw player
+// Check collisions (player with enemies and bullets with enemies)
+function checkCollisions() {
+    enemies.forEach((enemy, enemyIndex) => {
+        // Check player collision with enemies
+        const dx = player.x - enemy.x;
+        const dy = player.y - enemy.y;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        if (distance < player.radius + enemy.size) {
+            player.health -= 1; // Decrease player health on collision
+            enemies.splice(enemyIndex, 1); // Remove enemy on collision
+        }
+
+        // Check bullet collision with enemies
+        bullets.forEach((bullet, bulletIndex) => {
+            const dx = bullet.x - enemy.x;
+            const dy = bullet.y - enemy.y;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            if (distance < bullet.radius + enemy.size) {
+                enemies.splice(enemyIndex, 1); // Remove enemy on collision
+                bullets.splice(bulletIndex, 1); // Remove bullet on collision
+            }
+        });
+    });
+}
+
+// Draw player with trails
 function drawPlayer() {
+    // Draw the trail
+    ctx.globalAlpha = 0.1; // Set trail transparency
+    player.trail.forEach((trailPoint) => {
+        ctx.fillStyle = player.color;
+        ctx.fillRect(trailPoint.x - player.trailSize / 2, trailPoint.y - player.trailSize / 2, player.trailSize, player.trailSize); // Draw square with trail size
+    });
+    ctx.globalAlpha = 1.0; // Reset transparency
+
+    // Draw the player
     ctx.beginPath();
     ctx.arc(player.x, player.y, player.radius, 0, Math.PI * 2);
     ctx.fillStyle = player.color;
@@ -192,9 +279,18 @@ function drawBullets() {
     });
 }
 
-// Draw enemies
+// Draw enemies with trails
 function drawEnemies() {
     enemies.forEach(enemy => {
+        // Draw the trail
+        ctx.globalAlpha = 0.05; // Set trail transparency (dimmer)
+        enemy.trail.forEach((trailPoint) => {
+            ctx.fillStyle = enemy.color;
+            ctx.fillRect(trailPoint.x - enemy.size / 2, trailPoint.y - enemy.size / 2, enemy.size, enemy.size); // Draw square with enemy size
+        });
+        ctx.globalAlpha = 1.0; // Reset transparency
+
+        // Draw the enemy
         ctx.beginPath();
         ctx.moveTo(enemy.x, enemy.y - enemy.size / 2);
         ctx.lineTo(enemy.x - enemy.size / 2, enemy.y + enemy.size / 2);
