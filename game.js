@@ -54,7 +54,6 @@ canvas.addEventListener('mousemove', (e) => {
     mouse.x = e.clientX;
     mouse.y = e.clientY;
 });
-
 // Move player
 function movePlayer() {
     player.dx = 0;
@@ -82,21 +81,11 @@ function movePlayer() {
     if (keys[' '] && !player.isDashing) {
         player.isDashing = true;
         player.dashTime = 0; // Reset dash timer
-        
-        // Set the dash direction based on the last movement direction
-        if (player.lastDirection === 'up') {
-            player.dx = 0; // No change in dx, since we move upwards
-            player.dy = -player.dashSpeed; // Dash upwards
-        } else if (player.lastDirection === 'down') {
-            player.dx = 0; // No change in dx, since we move downwards
-            player.dy = player.dashSpeed; // Dash downwards
-        } else if (player.lastDirection === 'left') {
-            player.dx = -player.dashSpeed; // Dash left
-            player.dy = 0; // No change in dy, since we move left
-        } else if (player.lastDirection === 'right') {
-            player.dx = player.dashSpeed; // Dash right
-            player.dy = 0; // No change in dy, since we move right
-        }
+
+        // Calculate the angle to the mouse position
+        const angle = Math.atan2(mouse.y - player.y, mouse.x - player.x);
+        player.dx = Math.cos(angle) * player.dashSpeed; // Dash towards mouse x
+        player.dy = Math.sin(angle) * player.dashSpeed; // Dash towards mouse y
     }
 
     // If dashing, update dash timer and position
@@ -140,7 +129,7 @@ function movePlayer() {
     if (player.x - player.radius < 0) player.x = player.radius;
     if (player.x + player.radius > canvas.width) player.x = canvas.width - player.radius;
     if (player.y - player.radius < 0) player.y = player.radius;
-    if (player.y + player.radius > canvas.height) player.y = player.radius;
+    if (player.y + player.radius > canvas.height) player.y = canvas.height - player.radius;
 }
 
 // Shoot bullets toward the mouse
@@ -333,6 +322,35 @@ function gameLoop() {
     drawCrosshair();
 
     requestAnimationFrame(gameLoop);
+}
+// Draw player health on the canvas
+function drawHealth() {
+    ctx.fillStyle = 'white';
+    ctx.font = '20px Arial';
+    ctx.fillText(`Health: ${player.health}`, 10, 30); // Display health at the top-left corner
+}
+
+// Modify game loop to include drawHealth
+function gameLoop() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    movePlayer();
+    moveBullets();
+    moveEnemies();
+    checkCollisions();
+
+    drawPlayer();
+    drawBullets();
+    drawEnemies();
+    drawCrosshair();
+    drawHealth(); // Draw player health
+
+    requestAnimationFrame(gameLoop);
+}
+
+if (player.health <= 0) {
+    alert("Game Over! Your score: " + score); // or use a more elegant UI approach
+    document.location.reload(); // Reload the game
 }
 
 // Spawn enemies every 2 seconds
