@@ -8,11 +8,11 @@ const playerColor = 'rgb(22, 249, 234)';
 const bulletColor = 'rgb(22, 249, 234)';
 const enemyColor = 'rgb(251, 0, 255)';
 const crosshairColor = 'white';
-const playerRadius = 20;
-const bulletRadius = 5;
-const enemySize = 20;
-const crosshairSize = 10;
-const crosshairLineWidth = 2;
+const playerRadius = 25;  // Increased size
+const bulletRadius = 8;   // Increased size
+const enemySize = 40;      // Increased size
+const crosshairSize = 20;  // Increased size
+const crosshairLineWidth = 4; // Increased line width
 
 // Player object
 const player = {
@@ -21,6 +21,10 @@ const player = {
     radius: playerRadius,
     color: playerColor,
     speed: 5,
+    dashSpeed: 500,  // Increased dash speed for farther movement
+    isDashing: false,  // Flag to check if dashing
+    dashDuration: 300, // Duration of dash in milliseconds
+    dashTime: 0, // Time since dash started
     dx: 0,
     dy: 0,
     health: 100,
@@ -39,8 +43,12 @@ const bullets = [];
 let keys = {};
 
 // Event listeners for movement
-window.addEventListener('keydown', (e) => keys[e.key] = true);
-window.addEventListener('keyup', (e) => keys[e.key] = false);
+window.addEventListener('keydown', (e) => {
+    keys[e.key] = true;
+});
+window.addEventListener('keyup', (e) => {
+    keys[e.key] = false;
+});
 
 // Track mouse position
 canvas.addEventListener('mousemove', (e) => {
@@ -48,18 +56,40 @@ canvas.addEventListener('mousemove', (e) => {
     mouse.y = e.clientY;
 });
 
-// Move player
 function movePlayer() {
     player.dx = 0;
     player.dy = 0;
 
+    // Move player based on key inputs
     if (keys['ArrowUp'] || keys['w']) player.dy = -player.speed;
     if (keys['ArrowDown'] || keys['s']) player.dy = player.speed;
     if (keys['ArrowLeft'] || keys['a']) player.dx = -player.speed;
     if (keys['ArrowRight'] || keys['d']) player.dx = player.speed;
 
-    player.x += player.dx;
-    player.y += player.dy;
+    // Check for dash
+    if (keys[' '] && !player.isDashing) {
+        player.isDashing = true;
+        player.dashTime = 0; // Reset dash timer
+        const angle = Math.atan2(mouse.y - player.y, mouse.x - player.x);
+        player.dx += Math.cos(angle) * player.dashSpeed; // Add dash speed to current dx
+        player.dy += Math.sin(angle) * player.dashSpeed; // Add dash speed to current dy
+    }
+
+    // If dashing, update dash timer and position
+    if (player.isDashing) {
+        player.dashTime += 16; // Approximate time since last frame (16 ms)
+        player.x += player.dx;
+        player.y += player.dy;
+
+        // Stop dashing after duration
+        if (player.dashTime >= player.dashDuration) {
+            player.isDashing = false; // Stop dashing
+        }
+    } else {
+        // Move player normally based on key inputs
+        player.x += player.dx;
+        player.y += player.dy;
+    }
 
     // Prevent player from going out of bounds
     if (player.x - player.radius < 0) player.x = player.radius;

@@ -24,7 +24,7 @@ canvas {
 /* Bullet styles */
 .bullet {
     --radius: 5px;
-    --color: yellow; /* Ensure this is a valid CSS color */
+    --color: rgb(22, 249, 234); /* Ensure this is a valid CSS color */
 }
 
 /* Crosshair styles */
